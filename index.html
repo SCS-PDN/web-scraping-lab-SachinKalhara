@@ -1,4 +1,131 @@
-<form action="scrape" method="GET">
-  <input type="url" name="url" placeholder="Enter URL">
-  <button type="submit">Scrape</button>
-</form>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Scraper</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 80%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Web Scraper</h1>
+    <form action="scrape" method="post">
+        <label for="url">Enter URL to scrape:</label>
+        <input type="text" id="url" name="url" size="50" required><br><br>
+
+        <label>Select data to scrape:</label><br>
+        <input type="checkbox" id="titleHeadings" name="options" value="titleHeadings" checked>
+        <label for="titleHeadings">Title & Headings</label><br>
+        <input type="checkbox" id="links" name="options" value="links" checked>
+        <label for="links">Links</label><br>
+        <input type="checkbox" id="news" name="options" value="news">
+        <label for="news">News Headlines, Dates, Authors</label><br><br>
+
+        <input type="submit" value="Scrape">
+    </form>
+
+    <div id="results">
+        </div>
+
+    <button id="downloadCsvBtn" style="display:none;">Download as CSV</button>
+
+    <p id="visitCount"></p>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+            const resultsDiv = document.getElementById('results');
+
+            downloadCsvBtn.addEventListener('click', function() {
+                const table = resultsDiv.querySelector('table');
+                if (table) {
+                    const csvData = [];
+                    const rows = table.querySelectorAll('tr');
+                    rows.forEach(row => {
+                        const rowData = [];
+                        const cells = row.querySelectorAll('th, td');
+                        cells.forEach(cell => {
+                            rowData.push(cell.innerText);
+                        });
+                        csvData.push(rowData.join(','));
+                    });
+                    const csvString = csvData.join('\n');
+                    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'scraped_data.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else {
+                    alert('No table data to download.');
+                }
+            });
+
+            // Function to display JSON data in a table
+            function displayJsonAsTable(jsonData) {
+                if (!jsonData || jsonData.length === 0) {
+                    resultsDiv.innerHTML = '<p>No data scraped.</p>';
+                    downloadCsvBtn.style.display = 'none';
+                    return;
+                }
+
+                let tableHTML = '<table>';
+                const firstItem = jsonData[0];
+                if (typeof firstItem === 'object' && firstItem !== null) {
+                    // Create table headers from the keys of the first object
+                    tableHTML += '<thead><tr>';
+                    for (const key in firstItem) {
+                        tableHTML += `<th>${key}</th>`;
+                    }
+                    tableHTML += '</tr></thead><tbody>';
+
+                    // Add table rows from the JSON data
+                    jsonData.forEach(item => {
+                        tableHTML += '<tr>';
+                        for (const key in item) {
+                            tableHTML += `<td>${item[key]}</td>`;
+                        }
+                        tableHTML += '</tr>';
+                    });
+                } else if (Array.isArray(jsonData) && jsonData.length > 0 && typeof jsonData[0] === 'string') {
+                    // Handle array of strings (like title/headings or links)
+                    tableHTML += '<thead><tr><th>Data</th></tr></thead><tbody>';
+                    jsonData.forEach(item => {
+                        tableHTML += `<tr><td>${item}</td></tr>`;
+                    });
+                }
+                tableHTML += '</tbody></table>';
+                resultsDiv.innerHTML = tableHTML;
+                downloadCsvBtn.style.display = 'block';
+            }
+
+            // Fetch visit count and scraped data if available
+            fetch('scrape')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.scrapedData) {
+                        displayJsonAsTable(JSON.parse(data.scrapedData));
+                    }
+                    if (data.visitCount !== undefined) {
+                        document.getElementById('visitCount').innerText = `You have visited this page ${data.visitCount} times.`;
+                    }
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        });
+    </script>
+</body>
+</html>
